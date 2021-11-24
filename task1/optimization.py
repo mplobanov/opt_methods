@@ -1,6 +1,8 @@
 import numpy as np
 from numpy.linalg import LinAlgError
 import scipy
+import scipy.optimize
+import scipy.linalg as lnlg
 from datetime import datetime
 from collections import defaultdict
 
@@ -75,8 +77,19 @@ class LineSearchTool(object):
         alpha : float or None if failure
             Chosen step size
         """
-        # TODO: Implement line search procedures for Armijo, Wolfe and Constant steps.
-        return None
+        if self._method == 'Constant':
+            return self.c
+        alpha = None
+        if self._method == 'Wolfe':
+            alpha = scipy.optimize.line_search(oracle.func, oracle.grad, x_k, d_k, c1=self.c1, c2=self.c2)[0]
+        if self._method == 'Armijo' or (self._method == 'Wolfe' and alpha is None):
+            alpha_k = previous_alpha if previous_alpha else self.alpha_0
+            phi = lambda a: oracle.func(x_k + a * d_k)
+            phi_der0 = np.dot(oracle.grad(x_k), d_k)
+            while phi(alpha_k) > phi(0) + self.c1 * alpha_k * phi_der0:
+                alpha_k = alpha_k / 2
+            return alpha_k
+        return alpha
 
 
 def get_line_search_tool(line_search_options=None):
@@ -138,13 +151,39 @@ def gradient_descent(oracle, x_0, tolerance=1e-5, max_iter=10000,
     >> print('Found optimal point: {}'.format(x_opt))
        Found optimal point: [ 0.  1.  2.  3.  4.]
     """
+    start_time = datetime.now()
     history = defaultdict(list) if trace else None
     line_search_tool = get_line_search_tool(line_search_options)
     x_k = np.copy(x_0)
+    alpha_k = None
+    x0_grad_value = oracle.grad(x_0)
+
+    if display:
+        print("Gradient descent")
 
     # TODO: Implement gradient descent
     # Use line_search_tool.line_search() for adaptive step size.
-    return x_k, 'success', history
+    iterations_exceeded = False
+    for k in range(max_iter + 1):
+        func_value = oracle.func(x_k)
+        grad_value = oracle.grad(x_k)
+
+        if history is not None:
+            history['time'].append((datetime.now() - start_time).seconds)
+            history['func'].append(func_value)
+            history['grad_norm'].append(np.linalg.norm(grad_value))
+            if x_k.size <= 2:
+                history['x'].append(x_k)
+
+        if np.linalg.norm(grad_value) ** 2 <= tolerance * (np.linalg.norm(x0_grad_value) ** 2):
+            return x_k, 'success', history
+
+        d_k = - grad_value
+        alpha_k = line_search_tool.line_search(oracle, x_k, d_k, previous_alpha=alpha_k)
+
+        x_k = x_k + alpha_k * d_k
+
+    return x_k, 'iterations_exceeded', history
 
 
 def newton(oracle, x_0, tolerance=1e-5, max_iter=100,
@@ -197,10 +236,40 @@ def newton(oracle, x_0, tolerance=1e-5, max_iter=100,
     >> print('Found optimal point: {}'.format(x_opt))
        Found optimal point: [ 0.  1.  2.  3.  4.]
     """
+    start_time = datetime.now()
     history = defaultdict(list) if trace else None
     line_search_tool = get_line_search_tool(line_search_options)
     x_k = np.copy(x_0)
 
-    # TODO: Implement Newton's method.
+    x0_grad_value = oracle.grad(x_0)
+
+    if display:
+        print("Newton method")
+
+    # TODO: Implement gradient descent
     # Use line_search_tool.line_search() for adaptive step size.
-    return x_k, 'success', history
+    iterations_exceeded = False
+    try:
+        for k in range(max_iter + 1):
+            func_value = oracle.func(x_k)
+            grad_value = oracle.grad(x_k)
+            hess_value = oracle.hess(x_k)
+
+            if history is not None:
+                history['time'].append((datetime.now() - start_time).seconds)
+                history['func'].append(func_value)
+                history['grad_norm'].append(np.linalg.norm(grad_value))
+                if x_k.size <= 2:
+                    history['x'].append(x_k)
+
+            if np.linalg.norm(grad_value) ** 2 <= tolerance * (np.linalg.norm(x0_grad_value) ** 2):
+                return x_k, 'success', history
+
+            d_k = lnlg.cho_solve(lnlg.cho_factor(hess_value), -grad_value)
+            alpha_k = line_search_tool.line_search(oracle, x_k, d_k, previous_alpha=None)
+
+            x_k = x_k + alpha_k * d_k
+    except LinAlgError as err:
+        return x_k, 'computational_error', history
+
+    return x_k, 'iterations_exceeded', history

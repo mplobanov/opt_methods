@@ -7,6 +7,7 @@ class BaseSmoothOracle(object):
     """
     Base class for implementation of oracles.
     """
+
     def func(self, x):
         """
         Computes the value of function at point x.
@@ -18,13 +19,13 @@ class BaseSmoothOracle(object):
         Computes the gradient at point x.
         """
         raise NotImplementedError('Grad oracle is not implemented.')
-    
+
     def hess(self, x):
         """
         Computes the Hessian matrix at point x.
         """
         raise NotImplementedError('Hessian oracle is not implemented.')
-    
+
     def func_directional(self, x, d, alpha):
         """
         Computes phi(alpha) = f(x + alpha*d).
@@ -57,7 +58,7 @@ class QuadraticOracle(BaseSmoothOracle):
         return self.A.dot(x) - self.b
 
     def hess(self, x):
-        return self.A 
+        return self.A
 
 
 class LogRegL2Oracle(BaseSmoothOracle):
@@ -78,6 +79,7 @@ class LogRegL2Oracle(BaseSmoothOracle):
         matmat_ATsA : function
             Computes matrix-matrix-matrix product A^T * Diag(s) * A,
     """
+
     def __init__(self, matvec_Ax, matvec_ATx, matmat_ATsA, b, regcoef):
         self.matvec_Ax = matvec_Ax
         self.matvec_ATx = matvec_ATx
@@ -105,6 +107,7 @@ class LogRegL2OptimizedOracle(LogRegL2Oracle):
 
     For explanation see LogRegL2Oracle.
     """
+
     def __init__(self, matvec_Ax, matvec_ATx, matmat_ATsA, b, regcoef):
         super().__init__(matvec_Ax, matvec_ATx, matmat_ATsA, b, regcoef)
 
@@ -138,7 +141,6 @@ def create_log_reg_oracle(A, b, regcoef, oracle_type='usual'):
     return oracle(matvec_Ax, matvec_ATx, matmat_ATsA, b, regcoef)
 
 
-
 def grad_finite_diff(func, x, eps=1e-8):
     """
     Returns approximation of the gradient using finite differences:
@@ -147,8 +149,14 @@ def grad_finite_diff(func, x, eps=1e-8):
         e_i = (0, 0, ..., 0, 1, 0, ..., 0)
                           >> i <<
     """
-    # TODO: Implement numerical estimation of the gradient
-    return None
+
+    def get_ort(i):
+        ort = np.zeros(x.shape[0])
+        ort[i] = 1
+        return ort
+
+    get_der = lambda i: (func(x + eps * get_ort(i)) - func(x)) / eps
+    return np.vectorize(get_der)(np.arange(x.shape[0]))
 
 
 def hess_finite_diff(func, x, eps=1e-5):
@@ -162,5 +170,11 @@ def hess_finite_diff(func, x, eps=1e-5):
         e_i = (0, 0, ..., 0, 1, 0, ..., 0)
                           >> i <<
     """
-    # TODO: Implement numerical estimation of the Hessian
-    return None
+
+    def get_ort(i):
+        ort = np.zeros(x.shape[0])
+        ort[i] = 1
+        return ort
+
+    get_hess = lambda i, j: (func(x + eps * get_ort(i) + eps * get_ort(j)) - func(x + eps * get_ort(i)) - func(x + eps * get_ort(j)) + func(x)) / (eps ** 2)
+    return np.array([[get_hess(i, j) for i in range(x.shape[0])] for j in range(x.shape[0])])
