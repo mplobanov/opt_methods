@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 from scipy.special import expit
+import scipy.sparse
 
 
 class BaseSmoothOracle(object):
@@ -88,16 +89,17 @@ class LogRegL2Oracle(BaseSmoothOracle):
         self.regcoef = regcoef
 
     def func(self, x):
-        # TODO: Implement
-        return None
+        return np.mean(np.logaddexp(0, -self.b * self.matvec_Ax(x))) + self.regcoef * np.linalg.norm(x) ** 2 / 2
 
     def grad(self, x):
-        # TODO: Implement
-        return None
+        return self.regcoef * x - self.matvec_ATx(self.b * expit(-self.b * self.matvec_Ax(x))) / len(self.b)
 
     def hess(self, x):
-        # TODO: Implement
-        return None
+        sigm = expit(-self.b * self.matvec_Ax(x))
+        part1 = self.matmat_ATsA(sigm * (1 - sigm)) / len(self.b)
+        part2 = np.eye(len(x)) * self.regcoef
+
+        return part1 + part2
 
 
 class LogRegL2OptimizedOracle(LogRegL2Oracle):
@@ -125,12 +127,14 @@ def create_log_reg_oracle(A, b, regcoef, oracle_type='usual'):
     Auxiliary function for creating logistic regression oracles.
         `oracle_type` must be either 'usual' or 'optimized'
     """
-    matvec_Ax = lambda x: x  # TODO: Implement
-    matvec_ATx = lambda x: x  # TODO: Implement
+    matvec_Ax = lambda x: A @ x
+    matvec_ATx = lambda x: A.T @ x
 
     def matmat_ATsA(s):
-        # TODO: Implement
-        return None
+        if type(A) == type(s):
+            return A.T.dot(np.diag(s)).dot(A)
+
+        return A.transpose().dot(scipy.sparse.csr_matrix(scipy.diags(s))).dot(A)
 
     if oracle_type == 'usual':
         oracle = LogRegL2Oracle

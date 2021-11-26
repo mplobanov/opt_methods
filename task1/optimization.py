@@ -169,7 +169,7 @@ def gradient_descent(oracle, x_0, tolerance=1e-5, max_iter=10000,
         grad_value = oracle.grad(x_k)
 
         if history is not None:
-            history['time'].append((datetime.now() - start_time).seconds)
+            history['time'].append((datetime.now() - start_time).total_seconds())
             history['func'].append(func_value)
             history['grad_norm'].append(np.linalg.norm(grad_value))
             if x_k.size <= 2:
