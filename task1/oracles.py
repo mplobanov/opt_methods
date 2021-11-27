@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 from scipy.special import expit
+from scipy.sparse.construct import diags
 import scipy.sparse
 
 
@@ -134,7 +135,7 @@ def create_log_reg_oracle(A, b, regcoef, oracle_type='usual'):
         if type(A) == type(s):
             return A.T.dot(np.diag(s)).dot(A)
 
-        return A.transpose().dot(scipy.sparse.csr_matrix(scipy.diags(s))).dot(A)
+        return A.transpose().dot(scipy.sparse.csr_matrix(diags(s))).dot(A)
 
     if oracle_type == 'usual':
         oracle = LogRegL2Oracle

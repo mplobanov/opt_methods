@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 
 
+
 class LineSearchTool(object):
     """
     Line search tool for adaptively tuning the step size of the algorithm.
@@ -182,6 +183,8 @@ def gradient_descent(oracle, x_0, tolerance=1e-5, max_iter=10000,
         alpha_k = line_search_tool.line_search(oracle, x_k, d_k, previous_alpha=alpha_k)
 
         x_k = x_k + alpha_k * d_k
+        if display:
+            print('Iteration {} ended'.format(k))
 
     return x_k, 'iterations_exceeded', history
 
@@ -256,7 +259,7 @@ def newton(oracle, x_0, tolerance=1e-5, max_iter=100,
             hess_value = oracle.hess(x_k)
 
             if history is not None:
-                history['time'].append((datetime.now() - start_time).seconds)
+                history['time'].append((datetime.now() - start_time).total_seconds())
                 history['func'].append(func_value)
                 history['grad_norm'].append(np.linalg.norm(grad_value))
                 if x_k.size <= 2:
@@ -269,6 +272,9 @@ def newton(oracle, x_0, tolerance=1e-5, max_iter=100,
             alpha_k = line_search_tool.line_search(oracle, x_k, d_k, previous_alpha=None)
 
             x_k = x_k + alpha_k * d_k
+
+            if display:
+                print('Iteration {} ended'.format(k))
     except LinAlgError as err:
         return x_k, 'computational_error', history
 
